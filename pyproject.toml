@@ -56,20 +56,62 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.coverage.run]
+# Measure coverage for source code only
 source = ["src"]
-omit = ["*/proto/generated/*"]
+branch = true
+parallel = true
+# Exclude generated and vendored code
+omit = [
+  "*/proto/generated/*",
+  "*/tests/*",
+  "*/__pycache__/*",
+  "*/site-packages/*",
+]
+# Enable plugin support
+plugins = ["coverage.toml"]
 
 [tool.coverage.report]
+# Output format
+precision = 2
+show_missing = true
+skip_covered = false
+skip_empty = true
+# Fail if coverage is below threshold
+fail_under = 80
+# Ignore these patterns when reporting
 exclude_lines = [
+  # Standard pragma
   "pragma: no cover",
-  "def __repr__",
+  # Defensive programming
   "raise AssertionError",
   "raise NotImplementedError",
-  "if __name__ == .__main__.:",
+  "raise RuntimeError",
+  # Type checking
   "if TYPE_CHECKING:",
-  "class .*\\bProtocol\\):",
+  "if typing.TYPE_CHECKING:",
+  "@overload",
+  # Debugging
+  "if __name__ == .__main__.:",
+  "if DEBUG:",
+  # Abstract methods
   "@(abc\\.)?abstractmethod",
+  "class .*\\bProtocol\\):",
+  # Representation methods (low value to test)
+  "def __repr__",
+  "def __str__",
 ]
+# Partial coverage branches to ignore
+partial_branches = [
+  "pragma: no branch",
+  "if not TYPE_CHECKING:",
+  "if typing.TYPE_CHECKING:",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[tool.coverage.xml]
+output = "coverage.xml"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/genanki_next"]
@@ -77,6 +119,7 @@ packages = ["src/genanki_next"]
 [tool.hatch.build.targets.sdist]
 include = [
   "/src",
+  "/docs",
   "/tests",
   "/proto",
   "/README.md",
@@ -165,20 +208,108 @@ warn_required_dynamic_aliases = true  # Warn about required dynamic aliases
 warn_untyped_fields = true  # Warn about untyped model fields
 
 [tool.pytest]
+# Default command-line options
 addopts = [
   "--cov-report=html",
   "--cov-report=term-missing",
+  "--cov-report=xml",
+  # Coverage options
   "--cov=genanki_next",
-  "--strict-markers",
+  # Performance
+  "--durations=10",  # Show 10 slowest tests
+  "--strict-config",  # Error on config issues
+  "--strict-markers",  # Error on unknown markers
+  # Warnings
+  "--strict-xfail",  # xfail tests that pass will fail the suite
+  # Output options
+  "--tb=short",  # Shorter traceback format
+  "-W error",  # Turn warnings into errors
+  "-ra",  # Show summary of all test outcomes
 ]
+# Console output style
+console_output_style = "progress"
+# Doctest configuration
+doctest_optionflags = [
+  "ELLIPSIS",
+  "IGNORE_EXCEPTION_DETAIL",
+  "NORMALIZE_WHITESPACE",
+]
+faulthandler_exit_on_timeout = false
+# Timeout for tests (requires pytest-timeout plugin)
+faulthandler_timeout = 300
+# Filter warnings
+filterwarnings = [
+  "error",  # Turn all warnings into errors
+  "ignore::DeprecationWarning:pkg_resources",  # Ignore pkg_resources deprecations
+  "ignore::PendingDeprecationWarning",  # Ignore pending deprecations
+]
+junit_duration_report = "call"
+# JUnit XML report configuration
+junit_family = "xunit2"
+junit_log_passing_tests = true
+junit_logging = "all"
+junit_suite_name = "genanki_next"
+# Disable auto-indentation of multiline log messages
+log_auto_indent = false
+# Enable live logging during test execution
+log_cli = false
+log_cli_date_format = "%Y-%m-%d %H:%M:%S"
+log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s"
+log_cli_level = "INFO"
+log_date_format = "%Y-%m-%d %H:%M:%S"
+# File logging configuration
+log_file = "logs/pytest.log"
+log_file_date_format = "%Y-%m-%d %H:%M:%S"
+log_file_format = "%(asctime)s [%(levelname)8s] %(name)s:%(lineno)d - %(message)s"
+log_file_level = "DEBUG"
+log_file_mode = "w"
+# Captured log format (displayed on test failure)
+log_format = "%(asctime)s [%(levelname)8s] %(name)s - %(message)s"
+log_level = "INFO"
+# Test markers for categorizing tests
 markers = [
-  "integration: marks tests as integration tests",
-  "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+  "database: Tests requiring database setup",
+  "integration: Integration tests involving multiple components",
+  "network: Tests requiring network access",
+  "slow: Tests that take significant time (>1s)",
+  "unit: Fast isolated unit tests (default)",
+]
+# Minimum pytest version required
+minversion = "9.0"
+# Avoid recursing into these directories during test collection
+norecursedirs = [
+  "*.egg",
+  ".*",
+  ".venv",
+  "__pycache__",
+  "build",
+  "dist",
+  "docs",
+  "node_modules",
+  "proto",
+  "venv",
 ]
 python_classes = ["Test*"]
-python_files = ["test_*.py"]
+# Test discovery patterns
+python_files = ["*_test.py", "test_*.py"]
 python_functions = ["test_*"]
+# Add source directory to Python path for imports
+pythonpath = ["src"]
+# Required plugins
+required_plugins = [
+  "pytest-cov>=4.1.0",
+]
+# Directories to search for tests
 testpaths = ["tests"]
+tmp_path_retention_count = "3"
+# Temporary directory retention
+tmp_path_retention_policy = "failed"
+# Truncation limits for assertion messages
+truncation_limit_chars = 640
+truncation_limit_lines = 8
+# Assertion output configuration
+verbosity_assertions = "auto"
+verbosity_test_cases = "auto"
 
 [tool.ruff]
 # Target Python 3.10+ syntax
