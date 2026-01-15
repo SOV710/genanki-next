@@ -72,7 +72,7 @@ exclude_lines = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/genanki-next"]
+packages = ["src/genanki_next"]
 
 [tool.hatch.build.targets.sdist]
 include = [
@@ -138,7 +138,7 @@ plugins = [
 # Per-module configuration options
 [[tool.mypy.overrides]]
 # Ignore errors in generated protobuf code
-module = "genanki.proto.generated.*"
+module = "genanki-next.proto.generated.*"
 ignore_errors = true
 ignore_missing_imports = true
 
@@ -168,7 +168,7 @@ warn_untyped_fields = true  # Warn about untyped model fields
 addopts = [
   "--cov-report=html",
   "--cov-report=term-missing",
-  "--cov=genanki-next",
+  "--cov=genanki_next",
   "--strict-markers",
 ]
 markers = [
@@ -268,7 +268,7 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
 [tool.ruff.lint.isort]
 # Sort imports according to PEP 8
-known-first-party = ["genanki"]
+known-first-party = ["genanki_next"]
 force-single-line = false
 lines-after-imports = 2
 section-order = [
