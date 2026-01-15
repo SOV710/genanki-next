@@ -112,33 +112,136 @@ python_functions = ["test_*"]
 testpaths = ["tests"]
 
 [tool.ruff]
+# Target Python 3.10+ syntax
 target-version = "py310"
+# Line length to match Black's default
 line-length = 100
+# Directories to consider as first-party imports
 src = ["src", "tests"]
+# Exclude common non-source directories
+exclude = [
+  ".bzr",
+  ".direnv",
+  ".eggs",
+  ".git",
+  ".git-rewrite",
+  ".hg",
+  ".ipynb_checkpoints",
+  ".mypy_cache",
+  ".nox",
+  ".pants.d",
+  ".pyenv",
+  ".pytest_cache",
+  ".pytype",
+  ".ruff_cache",
+  ".svn",
+  ".tox",
+  ".venv",
+  ".vscode",
+  "__pypackages__",
+  "_build",
+  "buck-out",
+  "build",
+  "dist",
+  "node_modules",
+  "site-packages",
+  "venv",
+]
 
 [tool.ruff.lint]
+# Enable comprehensive rule sets
 select = [
   "E",  # pycodestyle errors
   "W",  # pycodestyle warnings
   "F",  # pyflakes
   "I",  # isort
+  "N",  # pep8-naming
+  "UP",  # pyupgrade
   "B",  # flake8-bugbear
   "C4",  # flake8-comprehensions
-  "UP",  # pyupgrade
-  "ARG",  # flake8-unused-arguments
   "SIM",  # flake8-simplify
-  "TCH",  # flake8-type-checking
-  "RUF",  # Ruff-specific rules
+  "ARG",  # flake8-unused-arguments
   "PTH",  # flake8-use-pathlib
+  "RUF",  # Ruff-specific rules
+  "PERF",  # Perflint performance hints
+  "FURB",  # refurb modernization suggestions
+  "LOG",  # flake8-logging
+  "G",  # flake8-logging-format
 ]
+# Disable specific rules that conflict with formatter or common patterns
 ignore = [
-  "E501",  # line too long (handled by formatter)
-  "B008",  # do not perform function calls in argument defaults
+  "E501",  # Line too long (handled by formatter)
+  "B008",  # Function call in default argument (used by FastAPI, Pydantic)
+  "RUF001",  # Ambiguous unicode character (allow strings in non-English)
+  "RUF002",  # Ambiguous unicode in docstring
+  "RUF003",  # Ambiguous unicode in comment
 ]
+# Allow autofix for all enabled rules when `--fix` is provided
+fixable = ["ALL"]
+unfixable = []
+# Allow unused variables when prefixed with underscore
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
 [tool.ruff.lint.per-file-ignores]
-"__init__.py" = ["F401"]  # unused imports
-"tests/**/*.py" = ["ARG"]  # unused arguments in tests
+# Ignore specific rules in specific files
+"__init__.py" = [
+  "F401",  # Unused imports (public API exposure)
+  "F403",  # Star imports (import *)
+]
+"tests/**/*.py" = [
+  "ARG",  # Unused function arguments (fixtures)
+  "S101",  # Use of assert (required in tests)
+  "PLR2004",  # Magic value in comparison
+]
+"scripts/**/*.py" = [
+  "T201",  # Print statements allowed in scripts
+]
 
 [tool.ruff.lint.isort]
-known-first-party = ["genanki-next"]
+# Sort imports according to PEP 8
+known-first-party = ["genanki"]
+force-single-line = false
+lines-after-imports = 2
+section-order = [
+  "future",
+  "standard-library",
+  "third-party",
+  "first-party",
+  "local-folder",
+]
+
+[tool.ruff.lint.flake8-bugbear]
+# Allow default arguments like b = [] in function definitions
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
+
+[tool.ruff.lint.flake8-type-checking]
+# Enforce type checking best practices
+strict = true
+runtime-evaluated-base-classes = ["pydantic.BaseModel"]
+
+[tool.ruff.lint.pydocstyle]
+# Use Google-style docstrings
+convention = "google"
+
+[tool.ruff.lint.pylint]
+# Maximum number of arguments for a function
+max-args = 6
+# Maximum number of branches in a function
+max-branches = 12
+# Maximum number of return statements
+max-returns = 6
+# Maximum number of statements
+max-statements = 50
+
+[tool.ruff.format]
+# Use double quotes for strings
+quote-style = "double"
+# Indent with spaces
+indent-style = "space"
+# Use Unix line endings
+line-ending = "auto"
+# Automatically detect magic trailing comma and respect it
+skip-magic-trailing-comma = false
+# Format docstrings
+docstring-code-format = true
+docstring-code-line-length = 88
