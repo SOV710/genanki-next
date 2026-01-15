@@ -1,0 +1,99 @@
+#+title: Templates Table
+#+startup: showall
+
+* Overview
+
+The =templates= table defines card generation templates for notetypes. Each template specifies HTML/CSS for card front and back, along with conditional generation rules.
+
+* Schema Definition
+
+#+begin_src sql
+CREATE TABLE templates (
+  ntid integer NOT NULL,
+  ord integer NOT NULL,
+  name text NOT NULL COLLATE unicase,
+  mtime_secs integer NOT NULL,
+  usn integer NOT NULL,
+  config blob NOT NULL,
+  PRIMARY KEY (ntid, ord)
+) without rowid
+#+end_src
+
+* Column Specifications
+
+- *ntid* (INTEGER): Notetype ID (semantic foreign key to =notetypes.id=)
+
+- *ord* (INTEGER): Template ordinal within notetype, 0-based
+  - Determines card order in browser
+  - Referenced by =cards.ord=
+
+- *name* (TEXT): Human-readable template name
+  - Case-insensitive collation (unicase)
+  - Must be unique within notetype
+  - Examples: "Card 1", "Forward", "Reverse"
+
+- *mtime_secs* (INTEGER): Last modification time, second-precision Unix timestamp
+  - Default: =0=
+
+- *usn* (INTEGER): Update sequence number
+  - Typically =-1= or =0=
+  - Default: =0=
+
+- *config* (BLOB): Template configuration
+  - Protocol Buffer message (see [[file:../proto/templates-config.org][templates.config]])
+  - Contains front/back HTML templates
+
+* Indexes
+
+- =idx_templates_usn= on =(usn)= - Sync operations
+- =idx_templates_name_ntid= on =(name, ntid)= UNIQUE - Unique names per notetype
+- =sqlite_autoindex_templates_1= on =(ntid, ord)= UNIQUE - Auto-created by PRIMARY KEY
+
+* Composite Primary Key
+
+The =(ntid, ord)= composite key with =WITHOUT ROWID= ensures:
+- Templates ordered by =ord= within each notetype
+- Efficient lookups by notetype
+- No duplicate ordinals per notetype
+
+* Template Naming Conventions
+
+** Basic Notetype
+- ord 0: "Card 1"
+
+** Basic (and reversed card)
+- ord 0: "Card 1"
+- ord 1: "Card 2"
+
+** Cloze
+- ord 0: "Cloze" (generates multiple cards dynamically)
+
+* Card Generation
+
+For each note, the template determines:
+1. Whether a card should be created (via =CardRequirement= in =notetypes.config=)
+2. How field content is displayed (via =config.q_format=, =config.a_format=)
+
+Cards generated only when template conditions are met:
+- Required fields non-empty (=KIND_ANY= or =KIND_ALL=)
+- Cloze deletions present (for cloze templates)
+
+* Template Relationships
+
+- =templates.ntid= → =notetypes.id=
+- =templates.ord= ← =cards.ord=
+- Template conditions: =notetypes.config.reqs=
+
+* Template Count
+
+Notetypes can have:
+- 1 template: Basic, Cloze
+- 2+ templates: Basic (reversed), custom notetypes
+- Dynamic: Cloze generates virtual templates per deletion
+
+* See Also
+
+- [[file:../proto/templates-config.org][Template configuration blob]]
+- [[file:notetypes.org][notetypes table (parent)]]
+- [[file:../proto/notetypes-config.org][Card generation requirements]]
+- [[file:cards.org][cards.ord field]]

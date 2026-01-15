@@ -1,0 +1,185 @@
+#+title: Notetype Configuration Blob
+#+startup: showall
+
+* Overview
+
+The =notetypes.config= blob stores notetype-wide settings including styling, LaTeX configuration, and card generation rules.
+
+* Protobuf Definition
+
+#+begin_src protobuf
+message Config {
+  enum Kind {
+    KIND_NORMAL = 0;
+    KIND_CLOZE = 1;
+  }
+  
+  message CardRequirement {
+    enum Kind {
+      KIND_NONE = 0;
+      KIND_ANY = 1;
+      KIND_ALL = 2;
+    }
+    uint32 card_ord = 1;
+    Kind kind = 2;
+    repeated uint32 field_ords = 3;
+  }
+  
+  Kind kind = 1;
+  uint32 sort_field_idx = 2;
+  string css = 3;
+  int64 target_deck_id_unused = 4;
+  string latex_pre = 5;
+  string latex_post = 6;
+  bool latex_svg = 7;
+  repeated CardRequirement reqs = 8;
+  StockNotetype.OriginalStockKind original_stock_kind = 9;
+  optional int64 original_id = 10;
+  
+  bytes other = 255;
+}
+#+end_src
+
+* Field Descriptions
+
+** Notetype Kind
+
+- *kind* (Kind enum): Notetype category
+
+  | Value | Name        | Description                          |
+  |-------|-------------|--------------------------------------|
+  | 0     | KIND_NORMAL | Standard explicit templates          |
+  | 1     | KIND_CLOZE  | Cloze deletion with dynamic templates |
+
+** Sorting
+
+- *sort_field_idx* (uint32): Index of field used for =notes.sfld=
+  - 0-based
+  - Typically =0= (first field)
+  - Used for alphabetical sorting in browser
+
+** Styling
+
+- *css* (string): Shared CSS stylesheet
+  - Applies to all cards from this notetype
+  - Injected into front and back templates
+
+Default CSS:
+#+begin_src css
+.card {
+    font-family: arial;
+    font-size: 20px;
+    text-align: center;
+    color: black;
+    background-color: white;
+}
+#+end_src
+
+** LaTeX Configuration
+
+- *latex_pre* (string): LaTeX document preamble
+  - Inserted before LaTeX expressions
+  - Includes =\documentclass=, =\usepackage= directives
+
+Default preamble:
+#+begin_src latex
+\documentclass[12pt]{article}
+\special{papersize=3in,5in}
+\usepackage[utf8]{inputenc}
+\usepackage{amssymb,amsmath}
+\pagestyle{empty}
+\setlength{\parindent}{0in}
+\begin{document}
+#+end_src
+
+- *latex_post* (string): LaTeX document postamble
+  - Inserted after LaTeX expressions
+
+Default postamble:
+#+begin_src latex
+\end{document}
+#+end_src
+
+- *latex_svg* (bool): LaTeX rendering engine
+  - =false=: Use dvipng (PNG output)
+  - =true=: Use dvisvgm (SVG output)
+
+** Card Generation Requirements
+
+- *reqs* (repeated CardRequirement): Conditional card generation rules
+  - One entry per template
+  - Determines when cards are created from notes
+
+** Import Tracking
+
+- *original_stock_kind* (enum): For stock notetypes created with Anki 2.1.62+
+  - Tracks original built-in notetype variant
+  - Used for update/migration logic
+
+- *original_id* (optional int64): Source collection notetype ID
+  - Set during import (Anki 23.10+)
+  - Unset: Locally created notetype
+  - Set: Imported from another collection
+
+** Deprecated
+
+- *target_deck_id_unused* (int64): Compatibility field
+  - Previously stored default deck for new cards
+  - Now stored separately via =DefaultsForAdding()=
+  - Contains millisecond timestamp for compatibility
+
+* CardRequirement Submessage
+
+Specifies when a template should generate a card:
+
+** Fields
+
+- *card_ord* (uint32): Template ordinal (0-based)
+  - Defaults to =0= if unset
+
+- *kind* (Kind enum): Field requirement logic
+
+  | Value | Name      | Meaning                          |
+  |-------|-----------|----------------------------------|
+  | 0     | KIND_NONE | No conditions (always generate)  |
+  | 1     | KIND_ANY  | Any listed field must be non-empty |
+  | 2     | KIND_ALL  | All listed fields must be non-empty |
+
+- *field_ords* (repeated uint32): Field indices to check (0-based)
+  - Order irrelevant
+  - Example: Basic notetype uses =[0, 1]= (both fields)
+
+** Examples
+
+Basic notetype (2 templates, both requiring Front and Back):
+#+begin_example
+reqs[0]: { card_ord: 0, kind: KIND_ANY, field_ords: [0, 1] }
+reqs[1]: { card_ord: 1, kind: KIND_ANY, field_ords: [0, 1] }
+#+end_example
+
+Optional extra field:
+#+begin_example
+reqs[0]: { card_ord: 0, kind: KIND_ANY, field_ords: [0] }
+// Card generated if field 0 non-empty, field 1 optional
+#+end_example
+
+* Default Configuration
+
+Standard Basic notetype config:
+
+#+begin_example
+kind: KIND_NORMAL
+sort_field_idx: 0
+css: (default CSS above)
+latex_pre: (default preamble above)
+latex_post: "\end{document}"
+latex_svg: false
+reqs: [{card_ord: 0, kind: KIND_ANY, field_ords: [0, 1]}]
+#+end_example
+
+* See Also
+
+- [[file:../tables/notetypes.org][notetypes table documentation]]
+- [[file:../tables/fields.org][fields table (field definitions)]]
+- [[file:../tables/templates.org][templates table (card templates)]]
+- [[file:templates-config.org][Template-specific configuration]]

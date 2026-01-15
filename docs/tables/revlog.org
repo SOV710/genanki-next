@@ -1,0 +1,140 @@
+#+title: Revlog Table (Review History)
+#+startup: showall
+
+* Overview
+
+The =revlog= table records every review action for statistical analysis and scheduling algorithm tuning. Each row represents one answer button press.
+
+* Schema Definition
+
+#+begin_src sql
+CREATE TABLE revlog (
+  id integer PRIMARY KEY,
+  cid integer NOT NULL,
+  usn integer NOT NULL,
+  ease integer NOT NULL,
+  ivl integer NOT NULL,
+  lastIvl integer NOT NULL,
+  factor integer NOT NULL,
+  time integer NOT NULL,
+  type integer NOT NULL
+)
+#+end_src
+
+* Column Specifications
+
+** Identity and References
+
+- *id* (INTEGER): Review timestamp, millisecond-precision Unix epoch
+  - Represents when answer button was pressed
+
+- *cid* (INTEGER): Card ID (semantic foreign key to =cards.id=)
+
+- *usn* (INTEGER): Update sequence number
+  - Typically =-1= or =0=
+
+** User Action
+
+- *ease* (INTEGER): Button pressed
+
+  | Value | Button |
+  |-------|--------|
+  | 1     | Again  |
+  | 2     | Hard   |
+  | 3     | Good   |
+  | 4     | Easy   |
+
+** Interval Changes
+
+- *ivl* (INTEGER): New interval assigned after this review
+  - Positive: Days (review cards)
+  - Negative: Seconds (learning/relearning steps)
+
+- *lastIvl* (INTEGER): Previous interval before this review
+  - Same encoding as =ivl=
+
+** Scheduling State
+
+- *factor* (INTEGER): Ease factor after this review
+  - Stored as multiplier × 1000
+  - Example: =2500= represents 2.5x
+
+- *time* (INTEGER): Time spent on card in milliseconds
+  - Includes question display time + answer time
+  - May be capped by =deck_config.config.cap_answer_time_to_secs=
+
+** Review Context
+
+- *type* (INTEGER): Review type/queue
+
+  | Value | Type      | Context                    |
+  |-------|-----------|----------------------------|
+  | 0     | Learning  | Initial learning steps     |
+  | 1     | Review    | Spaced repetition reviews  |
+  | 2     | Relearn   | Relearning after lapse     |
+  | 3     | Cram      | Filtered deck (cramming)   |
+
+* Indexes
+
+- =ix_revlog_cid= on =(cid)= - Card history lookup
+- =ix_revlog_usn= on =(usn)= - Sync operations
+
+* Use Cases
+
+** Statistics
+- Cards studied per day
+- Average ease per card
+- Retention rate calculation
+- Study time analysis
+
+** FSRS Training
+- Historical review data for algorithm optimization
+- Controlled by =deck_config.config.ignore_revlogs_before_date=
+
+** Debugging
+- Review history timeline
+- Scheduling algorithm verification
+
+* Interval Encoding
+
+Positive =ivl= represents days:
+#+begin_example
+ivl = 7    →  7 days
+ivl = 30   →  30 days
+#+end_example
+
+Negative =ivl= represents learning steps in seconds:
+#+begin_example
+ivl = -60     →  60 seconds (1 minute)
+ivl = -600    →  600 seconds (10 minutes)
+#+end_example
+
+* Time Spent Accuracy
+
+The =time= field may not reflect actual study time:
+- Includes time card was displayed before answer
+- Does not account for interruptions
+- May be capped to prevent outliers skewing statistics
+
+* Review Type Context
+
+| Type | Ease Buttons | Interval Behavior                |
+|------|--------------|----------------------------------|
+| 0    | Again/Good   | Learning steps progression       |
+| 1    | 1-4          | Interval multiplication by ease  |
+| 2    | Again/Good   | Relearning steps, reduced ease   |
+| 3    | Varies       | Temporary, preview mode          |
+
+* Data Retention
+
+Review logs are typically retained indefinitely for:
+- Long-term statistics
+- Algorithm training data
+- User study patterns
+
+Some users periodically archive old logs to reduce database size.
+
+* See Also
+
+- [[file:cards.org][cards table (scheduling state)]]
+- [[file:../proto/deck_config-config.org][Scheduling algorithm parameters]]

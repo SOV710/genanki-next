@@ -1,0 +1,104 @@
+#+title: Tags Table
+#+startup: showall
+
+* Overview
+
+The =tags= table stores tag metadata and UI state. This is *not* the source of note-tag associations (stored in =notes.tags=), but rather metadata about tags themselves.
+
+* Schema Definition
+
+#+begin_src sql
+CREATE TABLE tags (
+  tag text NOT NULL PRIMARY KEY COLLATE unicase,
+  usn integer NOT NULL,
+  collapsed boolean NOT NULL,
+  config blob NULL
+) without rowid
+#+end_src
+
+* Column Specifications
+
+- *tag* (TEXT): Tag string identifier
+  - Case-insensitive collation (unicase)
+  - May include hierarchy separator =::=
+  - Examples: "vocab", "languages::french"
+
+- *usn* (INTEGER): Update sequence number
+  - Typically =-1= or =0=
+
+- *collapsed* (boolean): UI collapse state
+  - =true=: Tag tree node collapsed (children hidden)
+  - =false=: Tag tree node expanded (children visible)
+
+- *config* (BLOB): Extension field for future use
+  - Nullable
+  - Currently unused
+
+* Indexes
+
+- =sqlite_autoindex_tags_1= on =(tag)= UNIQUE - Auto-created by PRIMARY KEY
+
+* Tag Storage Locations
+
+** Tag Metadata (this table)
+- Tag name
+- UI collapse state
+- Extension configuration
+
+** Note-Tag Associations
+Stored in =notes.tags= field:
+- Space-separated tag list
+- Format: = tag1 tag2 tag3 =
+
+* Tag Hierarchy
+
+Tags support hierarchical organization using =::= separator:
+
+#+begin_example
+languages
+languages::french
+languages::french::verbs
+languages::spanish
+#+end_example
+
+Hierarchy is a UI convention; the database stores flat tag names.
+
+* Collapse State
+
+The =collapsed= field controls sidebar display:
+- Parent tag collapsed → children hidden in tag tree
+- Affects UI only, not search or filtering
+- Per-user preference
+
+* New Collections
+
+In newly created collections, the =tags= table is typically empty. Tags are added:
+- Automatically when first used on a note
+- Manually via tag management interface
+
+* Tag Registry vs. Usage
+
+This table is a *registry*, not usage tracker:
+- Presence here: Tag exists in system
+- Absence here: Tag may still be used in =notes.tags=
+- Orphaned tags: Tag in =notes.tags= but not in registry
+
+Anki periodically syncs registry with actual tag usage.
+
+* Tag Cleanup
+
+Unused tags can be removed from registry:
+1. Find tags not present in any =notes.tags=
+2. Delete from =tags= table
+3. UI no longer displays them
+
+* Case Sensitivity
+
+Unicase collation means:
+- "Vocab" and "vocab" are identical
+- Only one variant stored
+- Consistent capitalization in UI
+
+* See Also
+
+- [[file:notes.org][notes.tags field (actual tag usage)]]

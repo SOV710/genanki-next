@@ -1,0 +1,199 @@
+#+title: Template Configuration Blob
+#+startup: showall
+
+* Overview
+
+The =templates.config= blob stores HTML templates for card front and back, along with browser display settings and deck targeting.
+
+* Protobuf Definition
+
+#+begin_src protobuf
+message Notetype {
+  message Template {
+    message Config {
+      string q_format = 1;
+      string a_format = 2;
+      string q_format_browser = 3;
+      string a_format_browser = 4;
+      int64 target_deck_id = 5;
+      string browser_font_name = 6;
+      uint32 browser_font_size = 7;
+      optional int64 id = 8;
+      bytes other = 255;
+    }
+  }
+}
+#+end_src
+
+* Field Descriptions
+
+** Card Templates
+
+- *q_format* (string): Question (front) template HTML
+  - Contains field placeholders: ={{FieldName}}=
+  - Supports conditional logic: ={{#FieldName}}...{{/FieldName}}=
+  - May include shared CSS from =notetypes.config.css=
+
+Example:
+#+begin_src html
+{{Front}}
+#+end_src
+
+- *a_format* (string): Answer (back) template HTML
+  - Contains field placeholders and question reference
+  - ={{FrontSide}}= includes rendered front template
+
+Example:
+#+begin_src html
+{{FrontSide}}
+
+<hr id=answer>
+
+{{Back}}
+#+end_src
+
+** Browser Display
+
+- *q_format_browser* (string): Browser column front template
+  - Simplified template for table view
+  - Typically empty (uses =q_format=)
+
+- *a_format_browser* (string): Browser column back template
+  - Simplified template for table view
+  - Typically empty (uses =a_format=)
+
+** Deck Targeting
+
+- *target_deck_id* (int64): Default deck for cards from this template
+  - =0= or unset: Use notetype's default deck
+  - Non-zero: Override deck for this template's cards
+
+Allows different templates to send cards to different decks.
+
+** Browser Styling
+
+- *browser_font_name* (string): Font for browser preview
+  - Overrides field font settings
+  - Empty: Use field defaults
+
+- *browser_font_size* (uint32): Font size for browser preview
+  - Overrides field font size
+  - =0=: Use field defaults
+
+** Unique Identifier
+
+- *id* (optional int64): Stable template identifier
+  - Used for tracking across imports/syncs
+  - Generated at template creation
+
+* Template Syntax
+
+** Field Substitution
+
+#+begin_example
+{{FieldName}}     →  Insert field content
+{{Field Name}}    →  Spaces allowed in field names
+#+end_example
+
+** Conditional Sections
+
+#+begin_example
+{{#FieldName}}
+  Content shown if field non-empty
+{{/FieldName}}
+
+{{^FieldName}}
+  Content shown if field empty
+{{/FieldName}}
+#+end_example
+
+** Special Fields
+
+#+begin_example
+{{FrontSide}}     →  Rendered front template (back only)
+{{Tags}}          →  Space-separated tag list
+{{Type}}          →  Type-in-the-answer field
+{{Deck}}          →  Deck name
+{{Subdeck}}       →  Deck name without parent
+{{Card}}          →  Template name
+#+end_example
+
+** Cloze Deletions
+
+#+begin_example
+{{cloze:Text}}    →  Cloze template field
+{{c1::hidden}}    →  First cloze deletion
+{{c2::also::hint}} →  Second deletion with hint
+#+end_example
+
+* Default Templates
+
+** Basic Front
+
+#+begin_src html
+{{Front}}
+#+end_src
+
+** Basic Back
+
+#+begin_src html
+{{FrontSide}}
+
+<hr id=answer>
+
+{{Back}}
+#+end_src
+
+** Cloze Front/Back
+
+#+begin_src html
+{{cloze:Text}}
+
+{{Back Extra}}
+#+end_src
+
+* Styling Integration
+
+Templates are wrapped in structure:
+
+#+begin_src html
+<div class="card">
+  <style>
+    /* notetypes.config.css injected here */
+  </style>
+  
+  <!-- q_format or a_format rendered here -->
+</div>
+#+end_src
+
+* Target Deck Use Cases
+
+** Language Learning
+
+#+begin_example
+Template 0 (Recognition): target_deck_id = 0 (default)
+Template 1 (Production): target_deck_id = 1234567890 (Production deck)
+#+end_example
+
+** Subject Separation
+
+#+begin_example
+Template 0 (Definition): → Terminology deck
+Template 1 (Examples): → Practice deck
+#+end_example
+
+* Browser Display Optimization
+
+Simplified templates for browser reduce rendering overhead:
+
+#+begin_example
+q_format: (full template with images, audio)
+q_format_browser: "{{Front}}"  (text only)
+#+end_example
+
+* See Also
+
+- [[file:../tables/templates.org][templates table documentation]]
+- [[file:notetypes-config.org][Notetype-wide configuration]]
+- [[file:../tables/cards.org][Card rendering]]
+- Anki template documentation: [[https://docs.ankiweb.net/templates/intro.html]]

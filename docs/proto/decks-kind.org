@@ -1,0 +1,52 @@
+#+title: Decks Kind Discriminator
+#+startup: showall
+
+* Overview
+
+The =decks.kind= blob uses a Protocol Buffer =oneof= to distinguish between Normal and Filtered decks. Only one variant can be present per deck.
+
+* Protobuf Definition
+
+#+begin_src protobuf
+oneof kind {
+  Normal normal = 6;
+  Filtered filtered = 7;
+}
+#+end_src
+
+* Deck Type Variants
+
+** Normal Deck
+
+Standard permanent deck containing cards from notes. Configuration stored in [[file:decks-normal.org][Normal message]].
+
+Example protobuf wire format: =0a 02 08 01=
+
+Decoded: =DeckKind.kind = Normal { config_id = 1 }=
+
+** Filtered Deck
+
+Temporary deck created by search query for cramming or custom study. Configuration stored in [[file:decks-filtered.org][Filtered message]].
+
+* Mutual Exclusivity
+
+A deck record cannot be both Normal and Filtered simultaneously. The =oneof= ensures exactly one variant is set.
+
+* Default Deck Type
+
+The root deck (=id = 1=, =name = "Default"=) is always a Normal deck.
+
+* Wire Format Example
+
+For a Normal deck referencing default config:
+
+#+begin_example
+Field 6 (Normal):
+  08 01  →  config_id = 1
+#+end_example
+
+* See Also
+
+- [[file:decks-normal.org][Normal deck configuration]]
+- [[file:decks-filtered.org][Filtered deck configuration]]
+- [[file:../tables/decks.org][decks table documentation]]

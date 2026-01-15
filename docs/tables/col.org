@@ -1,0 +1,83 @@
+#+title: Col Table (Collection Metadata)
+#+startup: showall
+
+* Overview
+
+The =col= table is a singleton table storing collection-level metadata. It always contains exactly one row with =id = 1=.
+
+* Schema Definition
+
+#+begin_src sql
+CREATE TABLE col (
+  id integer PRIMARY KEY,
+  crt integer NOT NULL,
+  mod integer NOT NULL,
+  scm integer NOT NULL,
+  ver integer NOT NULL,
+  dty integer NOT NULL,
+  usn integer NOT NULL,
+  ls integer NOT NULL,
+  conf text NOT NULL,
+  models text NOT NULL,
+  decks text NOT NULL,
+  dconf text NOT NULL,
+  tags text NOT NULL
+)
+#+end_src
+
+* Column Specifications
+
+** Identity
+
+- *id* (INTEGER): Primary key, always =1= (singleton pattern)
+
+** Timestamps
+
+- *crt* (INTEGER): Collection creation time, second-precision Unix timestamp
+- *mod* (INTEGER): Last modification time, millisecond-precision timestamp
+- *scm* (INTEGER): Schema modification time, millisecond-precision timestamp
+
+** Schema Version
+
+- *ver* (INTEGER): Collection schema version
+  - =11=: Legacy JSON-based schema (genanki current support)
+  - =18=: Current schema with protobuf and normalized tables
+
+** Synchronization State
+
+- *dty* (INTEGER): Dirty flag
+  - =0=: Clean, no pending changes
+  - Non-zero: Uncommitted/unsynchronized changes exist
+
+- *usn* (INTEGER): Update sequence number
+  - =-1=: Not synchronized
+  - =0=: Standard collections (typical value)
+
+- *ls* (INTEGER): Last sync state
+  - Typically =0=
+
+** Deprecated Fields (v18)
+
+These fields are retained for backward compatibility but should remain empty in v18:
+
+- *conf* (TEXT): Legacy global configuration (now in =config= table)
+- *models* (TEXT): Legacy notetype definitions (now in =notetypes= + =fields= + =templates=)
+- *decks* (TEXT): Legacy deck hierarchy (now in =decks= table)
+- *dconf* (TEXT): Legacy deck configurations (now in =deck_config= table)
+- *tags* (TEXT): Legacy tag registry (now in =tags= table)
+
+All deprecated fields should be set to empty strings (=""=) or minimal placeholder values.
+
+* Migration Notes
+
+When upgrading from v11 to v18:
+1. Set =ver= to =18=
+2. Empty all deprecated TEXT fields
+3. Migrate JSON data to corresponding normalized tables
+4. Update =scm= timestamp to reflect schema change
+
+* Invariants
+
+- Table must contain exactly one row
+- =id= must equal =1=
+- =ver= must match actual schema implementation

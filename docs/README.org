@@ -1,0 +1,226 @@
+#+title: Anki Collection Schema v18 Architecture
+#+author: SOV710
+#+date: <2026-01-11 Sun>
+#+startup: showall
+
+* Overview
+
+This documentation covers the Anki collection database schema version 18 (v18), which represents a significant evolution from the previous v11 schema supported by genanki.
+
+** Key Changes from v11 to v18
+
+- *ZSTD Compression*: Collections are now stored as =collection.anki21b= files (ZSTD-compressed SQLite databases)
+- *Protobuf Serialization*: Configuration data migrated from JSON to Protocol Buffers
+- *Normalized Schema*: Legacy JSON blobs in =col= table extracted into dedicated tables
+- *Unicase Collation*: Case-insensitive sorting via custom SQLite collation
+
+** Database Information
+
+| Property       | Value              |
+|----------------+--------------------|
+| File Format    | collection.anki21b |
+| Compression    | ZSTD               |
+| Schema Version | v18                |
+| Base Format    | SQLite 3           |
+
+* Table Index
+
+** Core Tables
+
+*** Collection Metadata
+- [[file:tables/col.org][col]] - Collection metadata (singleton table, schema version, timestamps)
+- [[file:tables/config.org][config]] - Global configuration key-value store (scheduler settings, UI preferences)
+
+*** Content Tables
+- [[file:tables/notes.org][notes]] - Note content storage (field data, tags, checksums)
+- [[file:tables/cards.org][cards]] - Individual flashcard instances (scheduling state, due dates)
+
+*** Type Definitions
+- [[file:tables/notetypes.org][notetypes]] - Note type definitions (styling, LaTeX config)
+- [[file:tables/fields.org][fields]] - Notetype field definitions (font, RTL, sticky behavior)
+- [[file:tables/templates.org][templates]] - Card template definitions (front/back HTML)
+
+*** Deck Management
+- [[file:tables/decks.org][decks]] - Deck hierarchy (normal vs. filtered)
+- [[file:tables/deck_config.org][deck_config]] - Scheduling algorithm parameters (learning steps, intervals)
+
+** Auxiliary Tables
+
+- [[file:tables/tags.org][tags]] - Tag registry (metadata, collapse state)
+- [[file:tables/revlog.org][revlog]] - Review history log (statistics, FSRS training data)
+- [[file:tables/graves.org][graves]] - Deletion tracking (sync tombstones)
+
+* Protobuf Blob Index
+
+Several tables store configuration as serialized Protocol Buffer messages. These blobs replace the legacy JSON format used in schema v11.
+
+** Deck Configuration Blobs
+
+- [[file:proto/deck_config-config.org][deck_config.config]] - Scheduling algorithm parameters
+  - Learning/relearning steps, ease factors, daily limits
+  - FSRS parameters, leech thresholds, card ordering
+  
+- [[file:proto/decks-common.org][decks.common]] - Shared deck metadata
+  - Study statistics, collapse state, last study time
+
+- [[file:proto/decks-kind.org][decks.kind]] - Deck type discriminator (oneof)
+  - Normal vs. Filtered deck determination
+
+- [[file:proto/decks-normal.org][decks.kind.normal]] - Normal deck configuration
+  - Config reference, daily limit overrides, description
+
+- [[file:proto/decks-filtered.org][decks.kind.filtered]] - Filtered deck configuration
+  - Search queries, sort orders, preview delays
+
+** Notetype Configuration Blobs
+
+- [[file:proto/notetypes-config.org][notetypes.config]] - Notetype-wide settings
+  - CSS styling, LaTeX preamble/postamble, card requirements
+  - Notetype kind (normal vs. cloze), sort field
+
+- [[file:proto/fields-config.org][fields.config]] - Field-specific settings
+  - Font family/size, RTL support, sticky behavior
+  - Plain text mode, collapse state, deletion prevention
+
+- [[file:proto/templates-config.org][templates.config]] - Card template HTML
+  - Question/answer formats, browser display templates
+  - Target deck, browser fonts
+
+* Schema Versioning
+
+The =col.ver= field tracks the schema version:
+
+- *v11*: Legacy JSON-based schema (genanki current support)
+  - Metadata stored in =col= table JSON fields
+  - Limited normalization, slower queries
+  
+- *v18*: Current schema with protobuf and normalized tables
+  - Extracted metadata into dedicated tables
+  - Binary protobuf for efficient storage
+  - Improved query performance via indexes
+
+* Data Relationships
+
+#+begin_example
+Collection Hierarchy:
+  col (1) - Collection-wide metadata
+    └─> config (N) - Key-value configuration
+
+Notetype Structure:
+  notetypes (1) ──< fields (N)
+                ──< templates (N)
+
+Content Generation:
+  notetypes (1) ──< notes (N)
+  notes (1) ──< cards (N)
+
+Deck Organization:
+  decks (N) ──> deck_config (1)
+  cards (N) ──> decks (1)
+
+Review History:
+  cards (1) ──< revlog (N)
+
+Tag System:
+  tags (N) - Tag metadata registry
+  notes.tags - Actual tag associations
+
+Synchronization:
+  graves (N) - Deletion tombstones
+#+end_example
+
+* Table Statistics
+
+Based on a minimal fresh collection:
+
+| Table       | Typical Rows | Purpose                    |
+|-------------+--------------+----------------------------|
+| col         | 1 (fixed)    | Singleton metadata         |
+| config      | ~16          | Global settings            |
+| deck_config | 1+           | At least default config    |
+| decks       | 1+           | At least "Default" deck    |
+| notetypes   | 1+           | At least one notetype      |
+| fields      | 2+ per type  | Depends on notetypes       |
+| templates   | 1+ per type  | Depends on notetypes       |
+| notes       | Variable     | User content               |
+| cards       | Variable     | Generated from notes       |
+| tags        | 0+           | Populated as tags are used |
+| revlog      | Variable     | Grows with reviews         |
+| graves      | Variable     | Temporary sync records     |
+
+* Implementation Notes
+
+** BLOB Encoding
+
+All =blob= type columns use Protocol Buffer wire format:
+- Variable-length encoding for integers
+- Length-prefixed strings
+- Nested message support
+- Backward/forward compatibility via field numbers
+
+** Unicase Collation
+
+Custom SQLite collation function for case-insensitive comparisons:
+- Used in =name= fields (decks, notetypes, fields, templates, tags)
+- Ensures "Vocab" and "vocab" are treated as identical
+- Implemented via Rust =unicase= crate
+
+** WITHOUT ROWID Optimization
+
+Applied to tables with composite primary keys:
+- =config=, =fields=, =graves=, =tags=, =templates=
+- Reduces storage overhead
+- Improves lookup performance
+
+** Timestamp Precision
+
+Different precision used for different purposes:
+- Milliseconds: =col.mod=, =col.scm=, note/card IDs
+- Seconds: =col.crt=, modification times, review timestamps (=revlog.id= exception)
+- Minutes: Learning card =due= times
+
+* Migration Path (v11 → v18)
+
+1. Extract JSON from =col= table fields
+2. Create normalized table entries (decks, notetypes, etc.)
+3. Convert JSON configs to protobuf blobs
+4. Update =col.ver= to =18=
+5. Clear deprecated =col= table TEXT fields
+6. Update =col.scm= timestamp
+
+* Index Strategy
+
+** Primary Indexes (Auto-created)
+- All PRIMARY KEY constraints
+- UNIQUE constraints (e.g., =idx_decks_name=)
+
+** Foreign Key Lookups
+- =ix_cards_nid= - Card → Note lookup
+- =idx_notes_mid= - Note → Notetype lookup
+
+** Scheduling Queries
+- =ix_cards_sched= on =(did, queue, due)= - Core scheduler query
+
+** Sync Operations
+- =usn= indexes across multiple tables
+- =idx_graves_pending= for tombstone sync
+
+** Deduplication
+- =ix_notes_csum= - Duplicate detection during import
+
+* References
+
+** Official Sources
+- Anki Source Repository: [[https://github.com/ankitects/anki]]
+- Protobuf Definitions: =anki/proto/anki/*.proto=
+- Rust Implementation: =rslib/src/=
+- Python Backend: =pylib/anki/=
+
+** Related Documentation
+- Anki Manual: [[https://docs.ankiweb.net/]]
+- Database Schema Changes: =rslib/src/storage/=
+- Migration Logic: =rslib/src/storage/upgrades/=
+
+** Community Resources
+- genanki (v11 support): [[https://github.com/kerrickstaley/genanki]]
+- Anki Forums: [[https://forums.ankiweb.net/]]

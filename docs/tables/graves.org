@@ -1,0 +1,77 @@
+#+title: Graves Table (Deletion Tombstones)
+#+startup: showall
+
+* Overview
+
+The =graves= table implements tombstone records for synchronization. When objects (cards, notes, decks) are deleted, tombstone entries are created to propagate deletions across synced clients.
+
+* Schema Definition
+
+#+begin_src sql
+CREATE TABLE graves (
+  oid integer NOT NULL,
+  type integer NOT NULL,
+  usn integer NOT NULL,
+  PRIMARY KEY (oid, type)
+) WITHOUT ROWID
+#+end_src
+
+* Column Specifications
+
+- *oid* (INTEGER): Object ID of deleted entity
+  - May reference deleted =cards.id=, =notes.id=, or =decks.id=
+
+- *type* (INTEGER): Object type discriminator
+  - Identifies which table the deleted object belonged to
+
+- *usn* (INTEGER): Update sequence number
+  - Typically =-1= or =0=
+
+* Indexes
+
+- =idx_graves_pending= on =(usn)= - Sync queue index
+- =sqlite_autoindex_graves_1= on =(oid, type)= UNIQUE - Auto-created by PRIMARY KEY
+
+* Composite Primary Key
+
+The =(oid, type)= composite key ensures:
+- One tombstone per deleted object
+- Same ID can exist in different type categories
+- =WITHOUT ROWID= optimization for efficient lookups
+
+* Type Values
+
+Common type discriminators (exact values implementation-specific):
+
+| Type | Meaning        |
+|------|----------------|
+| 0    | Card deleted   |
+| 1    | Note deleted   |
+| 2    | Deck deleted   |
+
+* Synchronization Workflow
+
+1. User deletes a card/note/deck locally
+2. Physical deletion from respective table
+3. Tombstone created in =graves= with object ID and type
+4. During sync, tombstones propagate to other clients
+5. Remote clients delete matching objects
+6. Tombstones eventually cleaned up after successful sync
+
+* Tombstone Lifecycle
+
+- Created: When object deleted
+- Propagated: During sync operations
+- Cleaned: After all clients acknowledge deletion
+- Retention: May be kept for sync history
+
+* Usage Notes
+
+- Empty =graves= table indicates no pending deletions
+- Tombstones persist until successful sync propagation
+- Manual database edits should maintain tombstone consistency
+
+* See Also
+
+- =usn= field documentation across all tables
+- Anki synchronization protocol

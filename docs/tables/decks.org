@@ -1,0 +1,81 @@
+#+title: Decks Table
+#+startup: showall
+
+* Overview
+
+The =decks= table stores deck hierarchy and metadata. Each deck can be either Normal or Filtered, distinguished by the =kind= blob.
+
+* Schema Definition
+
+#+begin_src sql
+CREATE TABLE decks (
+  id integer PRIMARY KEY NOT NULL,
+  name text NOT NULL COLLATE unicase,
+  mtime_secs integer NOT NULL,
+  usn integer NOT NULL,
+  common blob NOT NULL,
+  kind blob NOT NULL
+)
+#+end_src
+
+* Column Specifications
+
+- *id* (INTEGER): Globally unique deck identifier
+  - Millisecond-precision timestamp
+  - Referenced by =cards.did=
+
+- *name* (TEXT): Human-readable deck name
+  - Case-insensitive collation (unicase)
+  - Hierarchical names use =::= separator (e.g., "Languages::Spanish::Verbs")
+
+- *mtime_secs* (INTEGER): Last modification time, second-precision Unix timestamp
+
+- *usn* (INTEGER): Update sequence number
+  - Typically =-1= for new decks
+
+- *common* (BLOB): Shared deck metadata
+  - Protocol Buffer message (see [[file:../proto/decks-common.org][decks.common]])
+  - Study statistics, collapse state
+
+- *kind* (BLOB): Deck type discriminator
+  - Protocol Buffer oneof (see [[file:../proto/decks-kind.org][decks.kind]])
+  - Either =Normal= or =Filtered=
+
+* Indexes
+
+- =idx_decks_name= on =(name)= UNIQUE - Ensures deck names are unique
+
+* Deck Types
+
+** Normal Decks
+
+Standard decks containing cards from various notes. Configuration stored in [[file:../proto/decks-normal.org][decks.normal]].
+
+** Filtered Decks
+
+Temporary decks created by search queries, used for cramming or custom study. Configuration stored in [[file:../proto/decks-filtered.org][decks.filtered]].
+
+* Deck Hierarchy
+
+Deck names use =::= as a hierarchy separator:
+- "Japanese"
+- "Japanese::Kanji"
+- "Japanese::Grammar"
+
+The database stores flat names; hierarchy is a UI convention.
+
+* Relationships
+
+- =decks.id= ← =cards.did=
+- =decks.kind.normal.config_id= → =deck_config.id=
+
+* Default Deck
+
+The root deck has =id = 1= and =name = "Default"=. It cannot be deleted.
+
+* See Also
+
+- [[file:../proto/decks-common.org][decks.common blob structure]]
+- [[file:../proto/decks-kind.org][decks.kind discriminator]]
+- [[file:../proto/decks-normal.org][Normal deck configuration]]
+- [[file:../proto/decks-filtered.org][Filtered deck configuration]]

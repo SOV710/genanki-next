@@ -1,0 +1,123 @@
+#+title: Config Table
+#+startup: showall
+
+* Overview
+
+The =config= table is a key-value store for global collection settings. It uses a =WITHOUT ROWID= optimization with the key as the primary key.
+
+* Schema Definition
+
+#+begin_src sql
+CREATE TABLE config (
+  KEY text NOT NULL PRIMARY KEY,
+  usn integer NOT NULL,
+  mtime_secs integer NOT NULL,
+  val blob NOT NULL
+) without rowid
+#+end_src
+
+* Column Specifications
+
+- *KEY* (TEXT): Configuration key, string primary key
+- *usn* (INTEGER): Update sequence number
+  - =-1=: Not synchronized (recommended for new decks)
+  - =0=: Synchronized
+- *mtime_secs* (INTEGER): Modification time, second-precision Unix timestamp
+- *val* (BLOB): Configuration value
+  - Serialized JSON or JSON-like encoding
+  - Type varies by key (boolean, integer, string, array)
+
+* Indexes
+
+- =sqlite_autoindex_config_1= on =(KEY)= UNIQUE - Auto-created by PRIMARY KEY
+
+* Standard Configuration Keys
+
+** Deck Selection
+
+- *activeDecks*: Currently active decks, array of deck IDs
+  - Example: =[1]=
+- *curDeck*: Current deck ID
+  - Example: =1=
+
+** Card Display
+
+- *addToCur*: Add new cards to current deck
+  - Type: boolean
+  - Example: =true=
+- *dueCounts*: Show due card counts
+  - Type: boolean
+  - Example: =true=
+- *estTimes*: Show estimated review times
+  - Type: boolean
+  - Example: =true=
+
+** Scheduling
+
+- *sched2021*: Use V3 scheduler
+  - Type: boolean
+  - Example: =true=
+- *schedVer*: Scheduler version
+  - =1=: V1 scheduler
+  - =2=: V2 scheduler
+  - Example: =2=
+- *dayLearnFirst*: Show day learning cards first
+  - Type: boolean
+  - Example: =false=
+
+** Card Creation
+
+- *curModel*: Current notetype ID (millisecond timestamp)
+  - Example: =1767897451168=
+- *nextPos*: Next card position for new cards
+  - Example: =1=
+
+** Time Settings
+
+- *creationOffset*: Timezone offset in minutes
+  - Example: =-480= (UTC-8)
+- *collapseTime*: Collapse review sessions within N seconds
+  - Example: =1200= (20 minutes)
+- *timeLim*: Time limit per card in seconds
+  - =0=: No limit
+  - Example: =0=
+
+** Sorting & Display
+
+- *sortType*: Default sort field
+  - Example: ="noteFld"=
+- *sortBackwards*: Reverse sort order
+  - Type: boolean
+  - Example: =false=
+- *newSpread*: New card distribution method
+  - =0=: Distribute across session
+  - Example: =0=
+
+* Example Data
+
+#+begin_example
+activeDecks     | 0  | 0          | [1]
+addToCur        | 0  | 0          | true
+collapseTime    | 0  | 0          | 1200
+creationOffset  | 0  | 0          | -480
+curDeck         | 0  | 0          | 1
+curModel        | -1 | 1767897451 | 1767897451168
+dayLearnFirst   | 0  | 0          | false
+dueCounts       | 0  | 0          | true
+estTimes        | 0  | 0          | true
+newSpread       | 0  | 0          | 0
+nextPos         | 0  | 0          | 1
+sched2021       | 0  | 0          | true
+schedVer        | 0  | 0          | 2
+sortBackwards   | 0  | 0          | false
+sortType        | 0  | 0          | "noteFld"
+timeLim         | 0  | 0          | 0
+#+end_example
+
+* Usage Notes
+
+- Most settings use =usn = 0= (synchronized state)
+- =curModel= is an exception with =usn = -1=, as it tracks local UI state
+- Boolean values stored as literals =true=/=false=
+- Numeric values stored as integers without quotes
+- String values enclosed in quotes

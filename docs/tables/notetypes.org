@@ -1,0 +1,107 @@
+#+title: Notetypes Table
+#+startup: showall
+
+* Overview
+
+The =notetypes= table defines note type schemas, including field definitions, card templates, and styling. Each notetype serves as a blueprint for creating notes with consistent structure.
+
+* Schema Definition
+
+#+begin_src sql
+CREATE TABLE notetypes (
+  id integer NOT NULL PRIMARY KEY,
+  name text NOT NULL COLLATE unicase,
+  mtime_secs integer NOT NULL,
+  usn integer NOT NULL,
+  config blob NOT NULL
+)
+#+end_src
+
+* Column Specifications
+
+- *id* (INTEGER): Unique notetype identifier
+  - Millisecond-precision timestamp
+  - Generated at creation time
+
+- *name* (TEXT): Human-readable notetype name
+  - Case-insensitive collation (unicase)
+  - Examples: "Basic", "Cloze", "Basic (and reversed card)"
+
+- *mtime_secs* (INTEGER): Last modification time, second-precision Unix timestamp
+
+- *usn* (INTEGER): Update sequence number
+  - Typically =-1= for local changes
+
+- *config* (BLOB): Notetype configuration
+  - Protocol Buffer message (see [[file:../proto/notetypes-config.org][notetypes.config]])
+  - Contains CSS, LaTeX settings, card requirements
+
+* Indexes
+
+- =idx_notetypes_usn= on =(usn)= - Sync operations
+- =idx_notetypes_name= on =(name)= UNIQUE - Ensures unique notetype names
+
+* Notetype Components
+
+Each notetype consists of:
+
+** Fields
+Defined in =fields= table, referenced by =ntid=
+- Field names, ordinals, display settings
+
+** Templates
+Defined in =templates= table, referenced by =ntid=
+- Front/back HTML templates
+- Card generation conditions
+
+** Styling
+Stored in =config= blob
+- Shared CSS for all cards
+- LaTeX preamble/postamble
+
+* Common Notetypes
+
+** Basic
+- Fields: "Front", "Back"
+- Templates: 1 (Front → Back)
+
+** Basic (and reversed card)
+- Fields: "Front", "Back"
+- Templates: 2 (Front → Back, Back → Front)
+
+** Cloze
+- Fields: "Text", "Back Extra"
+- Templates: Dynamic cloze deletions
+- Kind: =KIND_CLOZE=
+
+** Image Occlusion
+- Fields: "Occlusion", "Image", "Header", "Back Extra", "Comments"
+- Templates: Dynamically generated from occlusion masks
+
+* Relationships
+
+- =notetypes.id= ← =notes.mid=
+- =notetypes.id= ← =fields.ntid=
+- =notetypes.id= ← =templates.ntid=
+
+* Notetype Kinds
+
+Configured in =config.kind=:
+
+- *KIND_NORMAL* (0): Standard note type with explicit templates
+- *KIND_CLOZE* (1): Cloze deletion note type with dynamic templates
+
+* Import/Export
+
+During import, =config.original_id= tracks source collection ID:
+- Unset: Locally created notetype
+- Set: Imported from another collection
+
+Used for notetype merging and conflict resolution.
+
+* See Also
+
+- [[file:../proto/notetypes-config.org][Notetype configuration blob]]
+- [[file:fields.org][fields table (field definitions)]]
+- [[file:templates.org][templates table (card templates)]]
+- [[file:notes.org][notes table (instances)]]

@@ -1,0 +1,76 @@
+#+title: Decks Common Blob
+#+startup: showall
+
+* Overview
+
+The =decks.common= blob stores metadata shared by both Normal and Filtered decks, including study statistics and UI collapse state.
+
+* Protobuf Definition
+
+#+begin_src protobuf
+message Common {
+  bool study_collapsed = 1;
+  bool browser_collapsed = 2;
+  uint32 last_day_studied = 3;
+  int32 new_studied = 4;
+  int32 review_studied = 5;
+  int32 milliseconds_studied = 7;
+  int32 learning_studied = 6;
+
+  reserved 8 to 13;
+  bytes other = 255;
+}
+#+end_src
+
+* Field Descriptions
+
+** UI State
+
+- *study_collapsed* (bool): Whether deck is collapsed in main deck list (Study view)
+  - Default: =false=
+
+- *browser_collapsed* (bool): Whether deck is collapsed in card browser
+  - Default: =false=
+
+** Study Statistics
+
+- *last_day_studied* (uint32): Last study day number
+  - Uses collection's internal day counting system (not Unix days)
+  - Day 0 = collection creation date
+
+- *new_studied* (int32): New cards studied today (or in last counted period)
+  - Not needed for new empty decks
+
+- *review_studied* (int32): Review cards studied today
+  - Not needed for new empty decks
+
+- *learning_studied* (int32): Learning/relearning cards studied today
+  - Not needed for new empty decks
+
+- *milliseconds_studied* (int32): Previously set in V1 scheduler
+  - *Deprecated*: Not currently used, should not be set
+
+* Default Values
+
+For a newly created deck:
+
+#+begin_example
+study_collapsed: false
+browser_collapsed: false
+last_day_studied: 0
+new_studied: 0
+review_studied: 0
+learning_studied: 0
+milliseconds_studied: 0  (deprecated, don't set)
+#+end_example
+
+* Usage Notes
+
+- Statistics are reset daily based on collection's day rollover time
+- Collapse state is purely UI preference, doesn't affect scheduling
+- Day counting is relative to =col.crt= (collection creation time)
+
+* See Also
+
+- [[file:../tables/decks.org][decks table documentation]]
+- [[file:decks-kind.org][decks.kind (Normal vs. Filtered)]]

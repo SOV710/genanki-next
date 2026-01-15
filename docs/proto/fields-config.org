@@ -1,0 +1,139 @@
+#+title: Field Configuration Blob
+#+startup: showall
+
+* Overview
+
+The =fields.config= blob stores UI and editing behavior for individual fields within a notetype. Configuration includes font settings, text direction, and editor features.
+
+* Protobuf Definition
+
+#+begin_src protobuf
+message Config {
+  bool sticky = 1;
+  bool rtl = 2;
+  string font_name = 3;
+  uint32 font_size = 4;
+  string description = 5;
+  bool plain_text = 6;
+  bool collapsed = 7;
+  bool exclude_from_search = 8;
+  optional int64 id = 9;
+  optional uint32 tag = 10;
+  bool prevent_deletion = 11;
+  
+  bytes other = 255;
+}
+#+end_src
+
+* Field Descriptions
+
+** Editor Behavior
+
+- *sticky* (bool): Preserve field content when adding new notes
+  - =true=: Content remains after adding card (useful for deck/tags fields)
+  - =false=: Field clears after adding card
+  - Default: =false=
+
+- *plain_text* (bool): Edit as plain text
+  - =true=: No rich text formatting, no media embedding
+  - =false=: Full rich text editor with HTML, images, etc.
+  - Default: =false=
+
+- *collapsed* (bool): Collapse field in editor by default
+  - Saves screen space for optional/auxiliary fields
+  - Default: =false=
+
+** Text Display
+
+- *rtl* (bool): Right-to-left text direction
+  - For Arabic, Hebrew, Persian, etc.
+  - Default: =false=
+
+- *font_name* (string): Font family name
+  - Required field
+  - Default: ="Arial"=
+
+- *font_size* (uint32): Font size in points
+  - Required field
+  - Default: =20=
+
+** Metadata
+
+- *description* (string): Help text displayed in add/edit dialog
+  - Empty when not set
+  - Default: =""=
+
+- *id* (optional int64): Stable unique field identifier
+  - Required for field identity across syncs/imports
+  - Generated from OS random source (64-bit)
+  - Used to identify required fields during notetype merging
+
+- *tag* (optional uint32): Purpose unknown
+  - Not commonly used
+
+** Import/Merge Behavior
+
+- *exclude_from_search* (bool): Exclude from duplicate detection during import
+  - Used for notetype merging (Anki 23.10+)
+  - Default: =false=
+
+- *prevent_deletion* (bool): Disallow user deletion
+  - Protects critical fields (e.g., Image Occlusion templates)
+  - Default: =false=
+
+* Default Configuration
+
+Standard field defaults:
+
+#+begin_example
+sticky: false
+rtl: false
+font_name: "Arial"
+font_size: 20
+description: ""
+plain_text: false
+collapsed: false
+exclude_from_search: false
+prevent_deletion: false
+#+end_example
+
+* Common Configurations
+
+** Front Field (Basic Note Type)
+
+#+begin_example
+font_name: "Arial"
+font_size: 20
+sticky: false
+plain_text: false
+#+end_example
+
+** Tags Field
+
+#+begin_example
+font_name: "Arial"
+font_size: 20
+sticky: true           (preserve tags across cards)
+collapsed: true        (save space)
+#+end_example
+
+** Arabic Text Field
+
+#+begin_example
+font_name: "Traditional Arabic"
+font_size: 24
+rtl: true              (right-to-left)
+#+end_example
+
+** Protected System Field
+
+#+begin_example
+prevent_deletion: true
+exclude_from_search: true
+#+end_example
+
+* See Also
+
+- [[file:../tables/fields.org][fields table documentation]]
+- [[file:../tables/notes.org][notes.flds (field content storage)]]
+- [[file:../tables/notetypes.org][notetypes table (field parent)]]

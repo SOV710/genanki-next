@@ -1,0 +1,74 @@
+#+title: Fields Table
+#+startup: showall
+
+* Overview
+
+The =fields= table defines field schemas for notetypes. Each notetype has multiple fields (e.g., "Front", "Back", "Extra") stored as separate rows.
+
+* Schema Definition
+
+#+begin_src sql
+CREATE TABLE fields (
+  ntid integer NOT NULL,
+  ord integer NOT NULL,
+  name text NOT NULL COLLATE unicase,
+  config blob NOT NULL,
+  PRIMARY KEY (ntid, ord)
+) without rowid
+#+end_src
+
+* Column Specifications
+
+- *ntid* (INTEGER): Notetype ID (semantic foreign key to =notetypes.id=)
+- *ord* (INTEGER): Field ordinal, 0-based index
+- *name* (TEXT): Field name
+  - Case-insensitive collation
+  - Examples: "Front", "Back", "Text", "Extra", "Image"
+- *config* (BLOB): Field UI and behavior configuration
+  - Protocol Buffer message (see [[file:../proto/fields-config.org][fields.config]])
+
+* Indexes
+
+- =idx_fields_name_ntid= on =(name, ntid)= UNIQUE - Prevents duplicate field names within a notetype
+- =sqlite_autoindex_fields_1= on =(ntid, ord)= UNIQUE - Auto-created by PRIMARY KEY
+
+* Composite Primary Key
+
+The table uses =(ntid, ord)= as a composite primary key with =WITHOUT ROWID= optimization, improving query performance for lookups by notetype.
+
+* Field Ordering
+
+Fields are ordered by =ord=:
+- =ord = 0=: First field (typically "Front")
+- =ord = 1=: Second field (typically "Back")
+- =ord = N=: Additional fields
+
+The first field (=ord = 0=) is used as the sorting field (=notes.sfld=) by default.
+
+* Relationships
+
+- =fields.ntid= → =notetypes.id=
+- Field content stored in =notes.flds= (concatenated with =\x1f= separator)
+
+* Common Field Names
+
+** Basic Note Type
+- ord 0: "Front"
+- ord 1: "Back"
+
+** Cloze Note Type
+- ord 0: "Text"
+- ord 1: "Back Extra"
+
+** Image Occlusion
+- ord 0: "Occlusion"
+- ord 1: "Image"
+- ord 2: "Header"
+- ord 3: "Back Extra"
+- ord 4: "Comments"
+
+* See Also
+
+- [[file:../proto/fields-config.org][Field configuration blob structure]]
+- [[file:notes.org][Notes table (stores field content)]]
+- [[file:notetypes.org][Notetypes table (field parent)]]

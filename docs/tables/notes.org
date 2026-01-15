@@ -1,0 +1,144 @@
+#+title: Notes Table
+#+startup: showall
+
+* Overview
+
+The =notes= table is the core data structure storing note content. Each note generates one or more cards based on its notetype's templates. Notes are the canonical source of field content.
+
+* Schema Definition
+
+#+begin_src sql
+CREATE TABLE notes (
+  id integer PRIMARY KEY,
+  guid text NOT NULL,
+  mid integer NOT NULL,
+  mod integer NOT NULL,
+  usn integer NOT NULL,
+  tags text NOT NULL,
+  flds text NOT NULL,
+  sfld integer NOT NULL,
+  csum integer NOT NULL,
+  flags integer NOT NULL,
+  data text NOT NULL
+)
+#+end_src
+
+* Column Specifications
+
+** Identity
+
+- *id* (INTEGER): Unique note identifier, millisecond-precision timestamp
+- *guid* (TEXT): Globally unique identifier, pseudo-random Base91 encoded string
+  - Ensures uniqueness across collections during sync/import
+
+** Notetype Reference
+
+- *mid* (INTEGER): Notetype ID (semantic foreign key to =notetypes.id=)
+  - Determines field schema and card templates
+
+** Modification Tracking
+
+- *mod* (INTEGER): Last modification time, second-precision Unix timestamp
+- *usn* (INTEGER): Update sequence number
+  - New cards: =-1= (not synchronized)
+
+** Content
+
+- *tags* (TEXT): Space-separated tag list
+  - Format: = tag1 tag2 tag3 = (leading and trailing spaces)
+  - Empty: = = (single space)
+
+- *flds* (TEXT): Concatenated field content
+  - Separator: =\x1f= (Unit Separator, ASCII 31)
+  - Example: =Front content\x1fBack content\x1fExtra=
+  - Order matches =fields.ord=
+
+** Sorting and Deduplication
+
+- *sfld* (INTEGER): Sort field for alphabetical ordering
+  - Type =integer= allows numeric sorting when content is numeric
+  - Typically first field content
+  - Used in browser sort operations
+
+- *csum* (INTEGER): SHA-1 checksum for duplicate detection
+  - Computed from first field content
+  - Used to identify potential duplicates during import
+
+** Metadata
+
+- *flags* (INTEGER): Note-level flags (purpose varies by Anki version)
+  - Typically =0=
+
+- *data* (TEXT): Extension field for future use
+  - Typically empty: =""=
+
+* Indexes
+
+- =idx_notes_mid= on =(mid)= - Notetype lookup
+- =ix_notes_csum= on =(csum)= - Duplicate detection
+- =ix_notes_usn= on =(usn)= - Sync operations
+
+* Field Content Encoding
+
+Field values are concatenated with =\x1f= separator:
+
+#+begin_example
+Field 0: "What is the capital of France?"
+Field 1: "Paris"
+Field 2: "Western Europe"
+
+Stored as:
+"What is the capital of France?\x1fParis\x1fWestern Europe"
+#+end_example
+
+* Tag Format
+
+Tags use space delimiters with leading/trailing spaces:
+
+#+begin_example
+No tags: " "
+One tag: " vocab "
+Multiple: " vocab french geography "
+Nested: " languages::french vocab "
+#+end_example
+
+Nested tags use =::= separator (UI convention, not enforced by schema).
+
+* Sort Field (sfld)
+
+The =sfld= field enables efficient sorting:
+- Stores first field content (or configured sort field)
+- Integer type allows numeric sorting: "1", "2", "10" sorts correctly
+- Text sorting when content is non-numeric
+
+* Checksum Calculation
+
+The =csum= is SHA-1 hash of first field:
+1. Strip HTML tags from first field
+2. Normalize whitespace
+3. Compute SHA-1 hash
+4. Store as integer
+
+Used for detecting potential duplicates during import.
+
+* Relationships
+
+- =notes.mid= → =notetypes.id=
+- =notes.id= ← =cards.nid=
+- Field definitions: =fields= table (via =mid=)
+- Card generation: =templates= table (via =mid=)
+
+* Card Generation
+
+When a note is created/modified:
+1. Notetype templates evaluated against field content
+2. Each template's =CardRequirement= checked
+3. Cards created for templates whose conditions are met
+4. Existing cards updated or deleted as needed
+
+* See Also
+
+- [[file:notetypes.org][notetypes table (field schema)]]
+- [[file:fields.org][fields table (field definitions)]]
+- [[file:cards.org][cards table (generated cards)]]
+- [[file:templates.org][templates table (card generation rules)]]

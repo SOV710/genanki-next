@@ -1,0 +1,112 @@
+#+title: Normal Deck Configuration
+#+startup: showall
+
+* Overview
+
+The =decks.kind.normal= message configures standard permanent decks. It references a =deck_config= for scheduling parameters and can override daily limits.
+
+* Protobuf Definition
+
+#+begin_src protobuf
+message Normal {
+  message DayLimit {
+    uint32 limit = 1;
+    uint32 today = 2;
+  }
+  
+  int64 config_id = 1;
+  uint32 extend_new = 2;
+  uint32 extend_review = 3;
+  string description = 4;
+  bool markdown_description = 5;
+  optional uint32 review_limit = 6;
+  optional uint32 new_limit = 7;
+  DayLimit review_limit_today = 8;
+  DayLimit new_limit_today = 9;
+  optional float desired_retention = 10;
+  
+  reserved 12 to 15;
+}
+#+end_src
+
+* Field Descriptions
+
+** Configuration Reference
+
+- *config_id* (int64): References =deck_config.id=
+  - Default: =1= (default deck config)
+  - Multiple decks can share same config
+
+** Daily Limit Extensions
+
+- *extend_new* (uint32): Additional new cards beyond config limit
+  - Default: =0=
+
+- *extend_review* (uint32): Additional reviews beyond config limit
+  - Default: =0=
+
+** Description
+
+- *description* (string): Deck description text
+  - Displayed in deck options
+  - Default: empty
+
+- *markdown_description* (bool): Whether description uses Markdown formatting
+  - Default: =false=
+
+** Deck-Specific Limits
+
+- *review_limit* (optional uint32): Override =deck_config.reviews_per_day=
+  - If unset, uses value from referenced config
+
+- *new_limit* (optional uint32): Override =deck_config.new_per_day=
+  - If unset, uses value from referenced config
+
+** Today's Limits
+
+- *review_limit_today* (DayLimit): Today's review limit and progress
+  - =limit=: Effective limit for today
+  - =today=: Reviews completed today
+
+- *new_limit_today* (DayLimit): Today's new card limit and progress
+  - =limit=: Effective limit for today
+  - =today=: New cards seen today
+
+** FSRS Override
+
+- *desired_retention* (optional float): Deck-specific desired retention
+  - Overrides =deck_config.config.desired_retention=
+  - Range: 0.0 to 1.0 (typically 0.85 to 0.95)
+
+* DayLimit Submessage
+
+Tracks both limit and current progress:
+
+- *limit*: Maximum cards for today
+- *today*: Cards already studied today
+
+Reset daily at collection rollover time.
+
+* Default Configuration
+
+Minimal Normal deck:
+
+#+begin_example
+config_id: 1
+extend_new: 0
+extend_review: 0
+description: ""
+markdown_description: false
+#+end_example
+
+* Relationships
+
+- =normal.config_id= → =deck_config.id=
+- Parent table: [[file:../tables/decks.org][decks]]
+- Discriminator: [[file:decks-kind.org][decks.kind]]
+
+* See Also
+
+- [[file:../tables/deck_config.org][deck_config table]]
+- [[file:deck_config-config.org][Scheduling parameters]]
+- [[file:decks-filtered.org][Filtered deck alternative]]

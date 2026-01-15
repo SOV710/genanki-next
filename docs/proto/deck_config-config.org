@@ -1,0 +1,235 @@
+#+title: Deck Config Protobuf
+#+startup: showall
+
+* Overview
+
+The =deck_config.config= blob stores scheduling algorithm parameters as a serialized Protocol Buffer message. This configuration controls new card introduction, review intervals, and learning steps.
+
+* Protobuf Definition
+
+#+begin_src protobuf
+message Config {
+  repeated float learn_steps = 1;
+  repeated float relearn_steps = 2;
+  repeated float fsrs_params_4 = 3;
+  repeated float fsrs_params_5 = 5;
+  repeated float fsrs_params_6 = 6;
+
+  reserved 7 to 8;
+
+  uint32 new_per_day = 9;
+  uint32 reviews_per_day = 10;
+  uint32 new_per_day_minimum = 35;
+
+  float initial_ease = 11;
+  float easy_multiplier = 12;
+  float hard_multiplier = 13;
+  float lapse_multiplier = 14;
+  float interval_multiplier = 15;
+
+  uint32 maximum_review_interval = 16;
+  uint32 minimum_lapse_interval = 17;
+  uint32 graduating_interval_good = 18;
+  uint32 graduating_interval_easy = 19;
+
+  NewCardInsertOrder new_card_insert_order = 20;
+  NewCardGatherPriority new_card_gather_priority = 34;
+  NewCardSortOrder new_card_sort_order = 32;
+  ReviewMix new_mix = 30;
+  ReviewCardOrder review_order = 33;
+  ReviewMix interday_learning_mix = 31;
+
+  LeechAction leech_action = 21;
+  uint32 leech_threshold = 22;
+
+  bool disable_autoplay = 23;
+  uint32 cap_answer_time_to_secs = 24;
+  bool show_timer = 25;
+  bool stop_timer_on_answer = 38;
+  float seconds_to_show_question = 41;
+  float seconds_to_show_answer = 42;
+  QuestionAction question_action = 36;
+  AnswerAction answer_action = 43;
+  bool wait_for_audio = 44;
+  bool skip_question_when_replaying_answer = 26;
+
+  bool bury_new = 27;
+  bool bury_reviews = 28;
+  bool bury_interday_learning = 29;
+
+  float desired_retention = 37;
+  string ignore_revlogs_before_date = 46;
+  repeated float easy_days_percentages = 4;
+  reserved 39;
+  float historical_retention = 40;
+  string param_search = 45;
+
+  bytes other = 255;
+}
+#+end_src
+
+* Enum Definitions
+
+** NewCardInsertOrder
+
+Controls how new cards are initially ordered:
+
+| Value | Name                          | Meaning                    |
+|-------|-------------------------------|----------------------------|
+| 0     | NEW_CARD_INSERT_ORDER_DUE     | Order by due position      |
+| 1     | NEW_CARD_INSERT_ORDER_RANDOM  | Random order               |
+
+** NewCardGatherPriority
+
+Controls how new cards are selected from multiple decks:
+
+| Value | Name                                              | Description                                      |
+|-------|---------------------------------------------------|--------------------------------------------------|
+| 0     | NEW_CARD_GATHER_PRIORITY_DECK                     | Alphabetical deck order, then position           |
+| 1     | NEW_CARD_GATHER_PRIORITY_LOWEST_POSITION          | Ascending position, siblings consecutive         |
+| 2     | NEW_CARD_GATHER_PRIORITY_HIGHEST_POSITION         | Descending position, siblings consecutive        |
+| 3     | NEW_CARD_GATHER_PRIORITY_RANDOM_NOTES             | Random notes, siblings consecutive               |
+| 4     | NEW_CARD_GATHER_PRIORITY_RANDOM_CARDS             | Fully random, siblings not grouped               |
+| 5     | NEW_CARD_GATHER_PRIORITY_DECK_THEN_RANDOM_NOTES   | Alphabetical deck, random notes within           |
+
+** NewCardSortOrder
+
+Controls final sort order before presentation:
+
+| Value | Name                                          | Description                              |
+|-------+-----------------------------------------------+------------------------------------------|
+|     0 | NEW_CARD_SORT_ORDER_TEMPLATE                  | Template ordinal, then gather order      |
+|     1 | NEW_CARD_SORT_ORDER_NO_SORT                   | Preserve gather order                    |
+|     2 | NEW_CARD_SORT_ORDER_TEMPLATE_THEN_RANDOM      | Template ordinal, random within template |
+|     3 | NEW_CARD_SORT_ORDER_RANDOM_NOTE_THEN_TEMPLATE | Random notes, template order within note |
+|     4 | NEW_CARD_SORT_ORDER_RANDOM_CARD               | Fully randomized                         |
+
+** ReviewCardOrder
+
+Controls review card presentation order:
+
+| Value | Name                                        | Meaning                   |
+|-------+---------------------------------------------+---------------------------|
+|     0 | REVIEW_CARD_ORDER_DAY                       | Due day                   |
+|     1 | REVIEW_CARD_ORDER_DAY_THEN_DECK             | Due day, then deck        |
+|     2 | REVIEW_CARD_ORDER_DECK_THEN_DAY             | Deck, then due day        |
+|     3 | REVIEW_CARD_ORDER_INTERVALS_ASCENDING       | Shortest interval first   |
+|     4 | REVIEW_CARD_ORDER_INTERVALS_DESCENDING      | Longest interval first    |
+|     5 | REVIEW_CARD_ORDER_EASE_ASCENDING            | Lowest ease first         |
+|     6 | REVIEW_CARD_ORDER_EASE_DESCENDING           | Highest ease first        |
+|     7 | REVIEW_CARD_ORDER_RETRIEVABILITY_ASCENDING  | Hardest to retrieve first |
+|     8 | REVIEW_CARD_ORDER_RANDOM                    | Random order              |
+|     9 | REVIEW_CARD_ORDER_ADDED                     | Card creation order       |
+|    10 | REVIEW_CARD_ORDER_REVERSE_ADDED             | Reverse creation order    |
+|    11 | REVIEW_CARD_ORDER_RETRIEVABILITY_DESCENDING | Easiest to retrieve first |
+
+** ReviewMix
+
+Controls mixing of new/learning cards with reviews:
+
+| Value | Name                        | Meaning                 |
+|-------+-----------------------------+-------------------------|
+|     0 | REVIEW_MIX_MIX_WITH_REVIEWS | Interleave with reviews |
+|     1 | REVIEW_MIX_AFTER_REVIEWS    | Show after all reviews  |
+|     2 | REVIEW_MIX_BEFORE_REVIEWS   | Show before any reviews |
+
+** LeechAction
+
+Action to take when card becomes a leech:
+
+| Value | Name                      | Meaning                  |
+|-------|---------------------------|--------------------------|
+| 0     | LEECH_ACTION_SUSPEND      | Suspend the card         |
+| 1     | LEECH_ACTION_TAG_ONLY     | Tag but don't suspend    |
+
+** QuestionAction / AnswerAction
+
+Controls automatic answer/question display behavior (used with timers).
+
+* Field Descriptions
+
+** Learning Steps
+
+- *learn_steps*: Step durations (minutes) for new cards
+  - Example: =[1.0, 10.0]= means 1 minute, then 10 minutes
+- *relearn_steps*: Step durations when relearning lapsed cards
+
+** Daily Limits
+
+- *new_per_day*: Maximum new cards per day
+- *reviews_per_day*: Maximum reviews per day
+- *new_per_day_minimum*: Not currently used
+
+** Ease Factors
+
+- *initial_ease*: Starting ease for new cards (typically 2.5)
+- *easy_multiplier*: Interval multiplier for "Easy" button (typically 1.3)
+- *hard_multiplier*: Interval multiplier for "Hard" button (typically 1.2)
+- *lapse_multiplier*: Interval reduction when card lapses
+- *interval_multiplier*: Global interval scaling factor (typically 1.0)
+
+** Interval Constraints
+
+- *maximum_review_interval*: Maximum days between reviews (typically 36500 = 100 years)
+- *minimum_lapse_interval*: Minimum interval after lapse (typically 1 day)
+
+** Graduation Intervals
+
+- *graduating_interval_good*: Interval when graduating with "Good" (typically 1 day)
+- *graduating_interval_easy*: Interval when graduating with "Easy" (typically 4 days)
+
+** Leech Detection
+
+- *leech_threshold*: Lapses before marking as leech (typically 8)
+- *leech_action*: Suspend or tag only
+
+** Display Settings
+
+- *show_timer*: Display elapsed time
+- *disable_autoplay*: Disable automatic audio playback
+- *cap_answer_time_to_secs*: Maximum time counted for statistics (typically 60 seconds)
+
+** Burying
+
+- *bury_new*: Automatically bury sibling new cards
+- *bury_reviews*: Automatically bury sibling review cards
+- *bury_interday_learning*: Bury interday learning siblings
+
+** FSRS Parameters
+
+Free Spaced Repetition Scheduler parameters:
+
+- *fsrs_params_4*, *fsrs_params_5*, *fsrs_params_6*: Version-specific model parameters
+- *desired_retention*: Target retention rate (typically 0.9)
+- *historical_retention*: Observed historical retention
+- *ignore_revlogs_before_date*: Exclude old review data
+- *easy_days_percentages*: Per-weekday difficulty adjustments
+
+* Default Configuration
+
+Decoded from protobuf wire format:
+
+| Field                       | Default Value |
+|-----------------------------|---------------|
+| learn_steps                 | [1.0, 10.0]   |
+| new_per_day                 | 20            |
+| reviews_per_day             | 200           |
+| initial_ease                | 2.5           |
+| easy_multiplier             | 1.3           |
+| hard_multiplier             | 1.2           |
+| interval_multiplier         | 1.0           |
+| maximum_review_interval     | 36500         |
+| minimum_lapse_interval      | 1             |
+| graduating_interval_good    | 1             |
+| graduating_interval_easy    | 4             |
+| leech_action                | TAG_ONLY      |
+| leech_threshold             | 8             |
+| cap_answer_time_to_secs     | 60            |
+| desired_retention           | 0.9           |
+| historical_retention        | 0.9           |
+| wait_for_audio              | true          |
+
+* See Also
+
+- [[file:../tables/deck_config.org][deck_config table documentation]]
+- [[file:../tables/decks.org][decks table (references this config)]]

@@ -1,0 +1,131 @@
+#+title: Cards Table
+#+startup: showall
+
+* Overview
+
+The =cards= table stores individual flashcard instances. Each card is generated from a note using a specific template, and maintains its own scheduling state.
+
+* Schema Definition
+
+#+begin_src sql
+CREATE TABLE cards (
+  id integer PRIMARY KEY,
+  nid integer NOT NULL,
+  did integer NOT NULL,
+  ord integer NOT NULL,
+  mod integer NOT NULL,
+  usn integer NOT NULL,
+  type integer NOT NULL,
+  queue integer NOT NULL,
+  due integer NOT NULL,
+  ivl integer NOT NULL,
+  factor integer NOT NULL,
+  reps integer NOT NULL,
+  lapses integer NOT NULL,
+  left integer NOT NULL,
+  odue integer NOT NULL,
+  odid integer NOT NULL,
+  flags integer NOT NULL,
+  data text NOT NULL
+)
+#+end_src
+
+* Column Specifications
+
+** Primary Key
+
+- *id* (INTEGER): Unique card identifier, millisecond-precision timestamp
+
+** Foreign References
+
+- *nid* (INTEGER): Note ID (semantic foreign key to =notes.id=)
+- *did* (INTEGER): Deck ID (semantic foreign key to =decks.id=)
+- *ord* (INTEGER): Template ordinal (which template from notetype generated this card)
+
+** Modification Tracking
+
+- *mod* (INTEGER): Last modification time, second-precision Unix timestamp
+- *usn* (INTEGER): Update sequence number
+  - =-1=: Not synchronized
+  - =>=0=: Synchronized
+
+** Card State
+
+- *type* (INTEGER): Card learning state
+
+  | Value | State      |
+  |-------|------------|
+  | 0     | New        |
+  | 1     | Learning   |
+  | 2     | Review     |
+  | 3     | Relearning |
+
+- *queue* (INTEGER): Current scheduling queue
+
+  | Value | Queue         |
+  |-------|---------------|
+  | 0     | New           |
+  | 1     | Learning      |
+  | 2     | Review        |
+  | 3     | Day Learning  |
+  | -1    | Suspended     |
+  | -2    | Buried        |
+
+** Scheduling Parameters
+
+- *due* (INTEGER): Due time/position, interpretation depends on state
+
+  | State    | Due Meaning                                    |
+  |----------|------------------------------------------------|
+  | New      | Position ordinal                               |
+  | Learning | Unix timestamp in minutes                      |
+  | Review   | Days since collection creation                 |
+
+- *ivl* (INTEGER): Interval in days from last review to next
+  - New cards always have =ivl = 0=
+
+- *factor* (INTEGER): Ease factor, multiplied by 1000
+  - New cards: =0=
+  - Review cards typically: ~=2500= (representing 2.5x multiplier)
+
+** Learning Progress
+
+- *reps* (INTEGER): Review count (excludes preview sessions)
+- *lapses* (INTEGER): Lapse count (wrong answers during review state)
+- *left* (INTEGER): Remaining learning steps
+  - Only meaningful for Learning/Relearning states
+  - New cards: =0=
+
+** Filtered Deck Support
+
+- *odue* (INTEGER): Original due value before entering filtered deck
+  - =0= when not in filtered deck
+- *odid* (INTEGER): Original deck ID before entering filtered deck
+  - =0= when not in filtered deck
+
+** Metadata
+
+- *flags* (INTEGER): User-assigned flag, bitmask (u8)
+  - New cards: =0=
+- *data* (TEXT): Extension JSON field
+  - New cards: ="{}"=
+
+* Indexes
+
+- =idx_cards_odid= on =(odid)=
+- =ix_cards_sched= on =(did, queue, due)= - Primary scheduling query index
+- =ix_cards_nid= on =(nid)= - Note lookup
+- =ix_cards_usn= on =(usn)= - Sync operations
+
+* Data Generation
+
+Cards are automatically generated when:
+1. A note is created
+2. A template is added to the note's notetype
+3. The template's conditional logic evaluates to true for the note's field content
+
+* Relationships
+
+- =cards.nid= → =notes.id=
+- =cards.did= → =decks.id=
+- =cards.ord= → Template index in =templates= table (via =notetypes=)

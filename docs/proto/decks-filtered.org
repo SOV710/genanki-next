@@ -1,0 +1,142 @@
+#+title: Filtered Deck Configuration
+#+startup: showall
+
+* Overview
+
+The =decks.kind.filtered= message configures temporary "cramming" decks created by search queries. Cards are temporarily moved from their home decks for focused study.
+
+* Protobuf Definition
+
+#+begin_src protobuf
+message Filtered {
+  message SearchTerm {
+    enum Order {
+      OLDEST_REVIEWED_FIRST = 0;
+      RANDOM = 1;
+      INTERVALS_ASCENDING = 2;
+      INTERVALS_DESCENDING = 3;
+      LAPSES = 4;
+      ADDED = 5;
+      DUE = 6;
+      REVERSE_ADDED = 7;
+      RETRIEVABILITY_ASCENDING = 8;
+      RETRIEVABILITY_DESCENDING = 9;
+    }
+
+    string search = 1;
+    uint32 limit = 2;
+    Order order = 3;
+  }
+
+  bool reschedule = 1;
+  repeated SearchTerm search_terms = 2;
+  repeated float delays = 3;
+  uint32 preview_delay = 4;
+  uint32 preview_again_secs = 7;
+  uint32 preview_hard_secs = 5;
+  uint32 preview_good_secs = 6;
+}
+#+end_src
+
+* Field Descriptions
+
+** Rescheduling
+
+- *reschedule* (bool): Whether to reschedule cards based on performance
+  - =true=: Cards are rescheduled normally
+  - =false=: Preview mode, cards return to original due dates
+
+** Search Terms
+
+- *search_terms* (repeated SearchTerm): Query definitions
+  - Multiple searches can be combined
+  - Each term has search string, limit, and sort order
+
+** Preview Delays (Scheduler-Specific)
+
+- *delays* (repeated float): V1 scheduler only
+  - Step delays in minutes
+  - *Deprecated* in modern versions
+
+- *preview_delay* (uint32): V2 and old V3 scheduler
+  - Delay before returning card (minutes)
+
+- *preview_again_secs* (uint32): Recent V3 scheduler
+  - Delay after "Again" button (seconds)
+  - =0= means card immediately returns to original deck
+
+- *preview_hard_secs* (uint32): Recent V3 scheduler
+  - Delay after "Hard" button (seconds)
+
+- *preview_good_secs* (uint32): Recent V3 scheduler
+  - Delay after "Good" button (seconds)
+
+* SearchTerm Submessage
+
+** Fields
+
+- *search* (string): Anki search query
+  - Example: ="deck:Japanese is:due"=
+  - Supports full search syntax
+
+- *limit* (uint32): Maximum cards to include
+  - Example: =100=
+
+- *order* (Order enum): Sort order for selected cards
+
+** Order Enum Values
+
+| Value | Name                      | Description                    |
+|-------+---------------------------+--------------------------------|
+|     0 | OLDEST_REVIEWED_FIRST     | Longest time since last review |
+|     1 | RANDOM                    | Random order                   |
+|     2 | INTERVALS_ASCENDING       | Shortest interval first        |
+|     3 | INTERVALS_DESCENDING      | Longest interval first         |
+|     4 | LAPSES                    | Most lapses first              |
+|     5 | ADDED                     | Card creation order            |
+|     6 | DUE                       | Due date order                 |
+|     7 | REVERSE_ADDED             | Reverse creation order         |
+|     8 | RETRIEVABILITY_ASCENDING  | Hardest to remember first      |
+|     9 | RETRIEVABILITY_DESCENDING | Easiest to remember first      |
+
+* Usage Patterns
+
+** Cramming Deck
+
+#+begin_example
+reschedule: false
+search_terms: [{
+  search: "deck:Exam is:due"
+  limit: 200
+  order: DUE
+}]
+preview_good_secs: 600  (10 minutes)
+#+end_example
+
+** Lapsed Card Practice
+
+#+begin_example
+reschedule: true
+search_terms: [{
+  search: "rated:30:1"  (cards failed in last 30 days)
+  limit: 50
+  order: LAPSES
+}]
+#+end_example
+
+* Lifecycle
+
+1. User creates filtered deck with search
+2. Matching cards moved from original decks (=cards.odid= set)
+3. Study session in filtered deck
+4. Cards returned to original decks:
+   - Immediately if =reschedule = false=
+   - After delay if preview_*_secs set
+   - With updated scheduling if =reschedule = true=
+
+* See Also
+
+- [[file:../tables/decks.org][decks table documentation]]
+- [[file:decks-kind.org][Deck type discriminator]]
+- [[file:decks-normal.org][Normal deck alternative]]
+- [[file:../tables/cards.org][cards.odid field (filtered deck tracking)]]

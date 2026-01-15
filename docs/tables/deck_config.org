@@ -1,0 +1,52 @@
+#+title: Deck Config Table
+#+startup: showall
+
+* Overview
+
+The =deck_config= table stores scheduling and review algorithm parameters. Normal decks reference these configurations via =NormalDeck.config_id= → =deck_config.id=.
+
+* Schema Definition
+
+#+begin_src sql
+CREATE TABLE deck_config (
+  id integer PRIMARY KEY NOT NULL,
+  name text NOT NULL COLLATE unicase,
+  mtime_secs integer NOT NULL,
+  usn integer NOT NULL,
+  config blob NOT NULL
+)
+#+end_src
+
+* Column Specifications
+
+- *id* (INTEGER): Primary key, auto-incrementing
+  - Default deck config: =1=
+
+- *name* (TEXT): Human-readable configuration name
+  - Case-insensitive collation (unicase)
+  - Examples: "Default", "Hard Cards", "Languages"
+
+- *mtime_secs* (INTEGER): Last modification time, second-precision Unix timestamp
+  - Default: =0=
+
+- *usn* (INTEGER): Update sequence number
+  - Typically =0= for deck configs
+
+- *config* (BLOB): Serialized scheduling parameters
+  - Protocol Buffer message (see [[file:../proto/deck_config-config.org][deck_config.config]])
+  - Contains learning steps, intervals, daily limits, etc.
+
+* Relationships
+
+- Referenced by =decks.kind.normal.config_id=
+- Multiple decks can share the same configuration
+- Deck config with =id = 1= is the default configuration
+
+* Usage Notes
+
+The default deck configuration is automatically created with =id = 1= and contains sensible defaults for new users. Users can create additional configurations for specialized decks (e.g., medical terminology, language learning).
+
+* See Also
+
+- [[file:../proto/deck_config-config.org][Protocol Buffer definition for config field]]
+- [[file:decks.org][Decks table documentation]]
